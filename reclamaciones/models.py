@@ -7,7 +7,7 @@ import uuid
 class Proveedor(models.Model):
     razon_social = models.CharField(max_length=100)
     ruc = models.CharField(max_length=11, unique=True)
-    direccion = models.CharField(max_length=150)
+    domicilio_fiscal = models.CharField(max_length=150)
     telefono = models.CharField(max_length=20)
     email_contacto = models.EmailField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -18,18 +18,18 @@ class Proveedor(models.Model):
 
 class Marca(models.Model):
     proveedor = models.ForeignKey(Proveedor, on_delete=models.CASCADE, related_name='marcas')
-    nombre = models.CharField(max_length=100)
+    nombre_marca = models.CharField(max_length=100)
     descripcion = models.CharField(max_length=200)
     created_at = models.DateTimeField(auto_now_add=True)
     activa = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.nombre
+        return self.nombre_marca
 
 class Establecimiento(models.Model):
     marca = models.ForeignKey(Marca, on_delete=models.CASCADE, related_name='establecimientos')
-    nombre = models.CharField(max_length=100)
-    direccion = models.CharField(max_length=150, null=True, blank=True)  # ← opcional si es online
+    nombre_establecimiento = models.CharField(max_length=100)
+    direccion_establecimeinto = models.CharField(max_length=150, null=True, blank=True)  # ← opcional si es online
     distrito = models.CharField(max_length=50, null=True, blank=True)
     provincia = models.CharField(max_length=50, null=True, blank=True)
     departamento = models.CharField(max_length=50, null=True, blank=True)
@@ -43,7 +43,7 @@ class Establecimiento(models.Model):
     def clean(self):
         # Si es online, no debe haber dirección física
         if self.es_online:
-            if any([self.direccion, self.distrito, self.provincia, self.departamento]):
+            if any([self.direccion_establecimeinto, self.distrito, self.provincia, self.departamento]):
                 raise ValidationError("Un establecimiento online no debe tener dirección, distrito, provincia ni departamento.")
         else:
             # Si es físico, no debe haber enlace de acceso
@@ -51,7 +51,7 @@ class Establecimiento(models.Model):
                 raise ValidationError("Un establecimiento físico no debe tener enlace de acceso.")
 
     def __str__(self):
-        return self.nombre
+        return self.nombre_establecimiento
     
 class LibroReclamacion(models.Model):
     establecimiento = models.ForeignKey(
@@ -60,7 +60,7 @@ class LibroReclamacion(models.Model):
     libro_slug = models.SlugField(blank=True)
     establecimiento_slug = models.SlugField()
 
-    codigo = models.CharField(max_length=50)
+    codigo_libro = models.CharField(max_length=50)
     estado = models.CharField(max_length=20)  # activo, inactivo, cerrado
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -69,47 +69,47 @@ class LibroReclamacion(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.libro_slug:
-            self.libro_slug = slugify(self.codigo)
+            self.libro_slug = slugify(self.codigo_libro)
         super().save(*args, **kwargs)
 
     def get_url(self, base_url="http://localhost:5173"):  # reemplazar por la url de produccion
         return f"{base_url.rstrip('/')}/libros/libro-reclamacion/{self.libro_slug}/{self.establecimiento_slug}/"
 
     def get_identificador(self):
-        return self.libro_slug or str(self.codigo)
+        return self.libro_slug or str(self.codigo_libro)
 
     def __str__(self):
-        return f"{self.codigo} ({self.libro_slug}/{self.establecimiento_slug})"
+        return f"{self.codigo_libro} ({self.libro_slug}/{self.establecimiento_slug})"
 
 class Cliente(models.Model):
-    nombre = models.CharField(max_length=100)
-    tipo_doc = models.CharField(max_length=15)
-    documento_identidad = models.CharField(max_length=15)
+    nombre_cliente = models.CharField(max_length=100)
+    tipo_doc_cliente = models.CharField(max_length=15)
+    doc_id_cliente = models.CharField(max_length=15)
+    fecha_nacimiento = models.DateField(verbose_name="Fecha de nacimiento")
     email = models.EmailField(max_length=100)
     telefono = models.CharField(max_length=20)
-    fecha_nacimiento = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.nombre
+        return self.nombre_cliente
 
 class RepresentanteLegal(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='representantes')
-    nombre = models.CharField(max_length=100)
-    tipo_doc = models.CharField(max_length= 15)
-    documento_identidad = models.CharField(max_length=15)
+    nombre_representante = models.CharField(max_length=100)
+    tipo_doc_representante = models.CharField(max_length= 15)
+    doc_id_representante = models.CharField(max_length=15)
     parentesco = models.CharField(max_length=50)
     telefono = models.CharField(max_length=20)
 
     def __str__(self):
-        return f"{self.nombre} ({self.parentesco})"
+        return f"{self.nombre_representante} ({self.parentesco})"
 
 class EstadoReclamacion(models.Model):
-    nombre = models.CharField(max_length=50)
+    nombre_estado_reclamo = models.CharField(max_length=50)
     descripcion = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return self.nombre
+        return self.nombre_estado_reclamo
     
 class Reclamacion(models.Model):
     TIPO_CHOICES = [

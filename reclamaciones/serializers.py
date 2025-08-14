@@ -84,7 +84,7 @@ class ReclamacionConClienteSerializer(serializers.ModelSerializer):
     def validate_libro(self, value):
         try:
             # Busca el libro activo por su código
-            libro = LibroReclamacion.objects.get(codigo=value, estado="activo")
+            libro = LibroReclamacion.objects.get(codigo_libro=value, estado="activo")
             return libro
         except LibroReclamacion.DoesNotExist:
             raise serializers.ValidationError("No existe un libro activo con ese código.")
