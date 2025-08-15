@@ -29,7 +29,7 @@ class Marca(models.Model):
 class Establecimiento(models.Model):
     marca = models.ForeignKey(Marca, on_delete=models.CASCADE, related_name='establecimientos')
     nombre_establecimiento = models.CharField(max_length=100)
-    direccion_establecimeinto = models.CharField(max_length=150, null=True, blank=True)  # ← opcional si es online
+    direccion_establecimiento = models.CharField(max_length=150, null=True, blank=True)  # ← opcional si es online
     distrito = models.CharField(max_length=50, null=True, blank=True)
     provincia = models.CharField(max_length=50, null=True, blank=True)
     departamento = models.CharField(max_length=50, null=True, blank=True)

@@ -114,13 +114,18 @@ class ArchivoAdjuntoViewSet(viewsets.ModelViewSet):
     
 class CrearReclamacionConClienteView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
     
     def post(self, request):
+        print(" Payload recibido del front:", request.data)
+        
         serializer = ReclamacionConClienteSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            print("⚠️ Errores de validación:", serializer.errors)  # 👈 Aquí se ve el error
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class UsuarioPerfilView(APIView):
     permission_classes = [IsAuthenticated]

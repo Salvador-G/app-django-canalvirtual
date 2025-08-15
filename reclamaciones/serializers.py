@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import *
 from usuarios.models import Usuario
+from django.utils import timezone
+import traceback
 
 
 # Proveedor
@@ -13,7 +15,7 @@ class ProveedorSerializer(serializers.ModelSerializer):
 class ProveedorUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Proveedor
-        fields = ['razon_social', 'ruc', 'direccion', 'telefono', 'email_contacto']
+        fields = ['razon_social', 'ruc', 'domicilio_fiscal', 'telefono', 'email_contacto']
         
 # Marca incluye proveedor
 class MarcaSerializer(serializers.ModelSerializer):
@@ -61,7 +63,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 class EstadoReclamacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = EstadoReclamacion
-        fields = ['id', 'nombre', 'descripcion']
+        fields = ['id', 'nombre_estado_reclamo', 'descripcion']
         
 class ReclamacionConClienteSerializer(serializers.ModelSerializer):
     cliente = ClienteSerializer()
@@ -79,6 +81,8 @@ class ReclamacionConClienteSerializer(serializers.ModelSerializer):
         fields = '__all__'
         extra_kwargs = {
             'libro': {'write_only': True},
+            'fecha': {'required': False},        # no requerido
+            'codigo_hoja': {'required': False},  # no requerido
         }
 
     def validate_libro(self, value):
@@ -90,20 +94,34 @@ class ReclamacionConClienteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("No existe un libro activo con ese código.")
 
     def create(self, validated_data):
-        cliente_data = validated_data.pop('cliente')
-        libro_obj = validated_data.pop('libro')  # validado como objeto en `validate_libro`
+        try:
+            print("Datos antes de crear la reclamación:", validated_data)
 
-        cliente = Cliente.objects.create(**cliente_data)
-        reclamacion = Reclamacion.objects.create(
-            cliente=cliente,
-            libro=libro_obj,
-            **validated_data
-        )
-        return reclamacion
+            cliente_data = validated_data.pop('cliente')
+            libro_obj = validated_data.pop('libro')
+
+            cliente = Cliente.objects.create(**cliente_data)
+
+            codigo_hoja = f"H-{uuid.uuid4().hex[:8].upper()}"
+
+            reclamacion = Reclamacion.objects.create(
+                cliente=cliente,
+                libro=libro_obj,
+                fecha=timezone.now(),
+                codigo_hoja=codigo_hoja,
+                **validated_data
+            )
+            print("✅ Reclamación creada:", reclamacion)
+            return reclamacion
+
+        except Exception as e:
+            print("💥 Error al crear la reclamación:", e)
+            traceback.print_exc()
+            raise
     
 class ReclamacionDetalleProveedorSerializer(serializers.ModelSerializer):
     tipo = serializers.CharField(source='get_tipo_display')
-    estado = serializers.CharField(source='estado.nombre')
+    estado = serializers.CharField(source='estado.nombre_estado_reclamo')
     fecha = serializers.DateTimeField(format='%Y-%m-%d')
     reclamante = serializers.SerializerMethodField()
     establecimiento = serializers.SerializerMethodField()
@@ -191,26 +209,26 @@ class UsuarioPerfilSerializer(serializers.ModelSerializer):
             'id': proveedor.id,
             'razon_social': proveedor.razon_social,
             'ruc': proveedor.ruc,
-            'direccion': proveedor.direccion,
+            'direccion': proveedor.domicilio_fiscal,
             'telefono': proveedor.telefono,
             'email_contacto': proveedor.email_contacto,
             'marcas': [
                 {
                     'id': marca.id,
-                    'nombre': marca.nombre,
+                    'nombre': marca.nombre_marca,
                     'descripcion': marca.descripcion,
                     'establecimientos': [
                         {
                             'id': est.id,
-                            'nombre': est.nombre,
-                            'direccion': est.direccion,
+                            'nombre': est.nombre_establecimiento,
+                            'direccion': est.direccion_establecimiento,
                             'telefono': est.telefono,
                             'email_contacto': est.email_contacto,
                             'es_online': est.es_online,
                             'libros': [
                                 {
                                     'id': libro.id,
-                                    'codigo': libro.codigo,
+                                    'codigo': libro.codigo_libro,
                                     'estado': libro.estado,
                                     'reclamaciones_count': libro.reclamaciones.count(),
                                     'reclamaciones': [
@@ -223,9 +241,9 @@ class UsuarioPerfilSerializer(serializers.ModelSerializer):
                                             'detalle': reclamo.detalle,
                                             'cliente': {
                                                 'id': reclamo.cliente.id,
-                                                'nombre': reclamo.cliente.nombre,
-                                                'tipo_doc': reclamo.cliente.tipo_doc,
-                                                'documento_identidad': reclamo.cliente.documento_identidad,
+                                                'nombre': reclamo.cliente.nombre_cliente,
+                                                'tipo_doc': reclamo.cliente.tipo_doc_cliente,
+                                                'documento_identidad': reclamo.cliente.doc_id_cliente,
                                                 'email': reclamo.cliente.email,
                                                 'telefono': reclamo.cliente.telefono,
                                                 'fecha_nacimiento': reclamo.cliente.fecha_nacimiento
@@ -244,10 +262,10 @@ class UsuarioPerfilSerializer(serializers.ModelSerializer):
             ]
         }
         
-#lista completa de raclamos por proveedor
+#lista completa de reclamos por proveedor
 class ReclamacionPlanoSerializer(serializers.ModelSerializer):
-    estado = serializers.CharField(source='estado.nombre', read_only=True)
-    establecimiento = serializers.CharField(source='libro.establecimiento.nombre', read_only=True)
+    estado = serializers.CharField(source='estado.nombre_estado_reclamo', read_only=True)
+    establecimiento = serializers.CharField(source='libro.establecimiento.nombre_establecimiento', read_only=True)
     detalle_reclamacion = serializers.CharField(source='detalle', read_only=True)
     fecha = serializers.DateTimeField(format='%Y-%m-%d', read_only=True)
     reclamante = serializers.SerializerMethodField()
@@ -269,8 +287,8 @@ class ReclamacionPlanoSerializer(serializers.ModelSerializer):
     def get_reclamante(self, obj):
         if obj.cliente:
             return {
-                "nombre": obj.cliente.nombre,
-                "documento_identidad": obj.cliente.documento_identidad,
+                "nombre": obj.cliente.nombre_cliente,
+                "documento_identidad": obj.cliente.doc_id_cliente,
                 "email": obj.cliente.email
             }
         return "Anónimo"
